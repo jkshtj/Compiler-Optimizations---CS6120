@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+	"bril_control_flow",
+	"local_optimizations",
+]
+
