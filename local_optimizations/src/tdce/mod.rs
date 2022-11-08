@@ -1,11 +1,14 @@
+//! This module contains utilities to implement trivial dead code and dead store
+//! elimination optimization on bril programs.
+
+extern crate bril_control_flow;
 extern crate bril_rs;
 extern crate tracing;
-extern crate bril_control_flow;
 
-use std::collections::{HashSet, HashMap};
-use tracing::debug;
 use self::bril_control_flow::BasicBlock;
-use bril_rs::{ Instruction, Function };
+use bril_rs::{Function, Instruction};
+use std::collections::{HashMap, HashSet};
+use tracing::debug;
 
 /// A global optimization that deletes unused
 /// instructions across basic blocks.
@@ -28,11 +31,15 @@ pub fn dead_code_elimination_pass(func: &mut Function) -> bool {
     for instr in func.instrs.iter() {
         if let bril_rs::Code::Instruction(instr) = instr {
             match instr {
-                Instruction::Value { args, .. } |
-                Instruction::Effect { args, .. } => args.iter().for_each(|arg| {
-                    used.insert(arg.clone());
-                }),
-                _ => debug!("Skipping instr: [{}], as it does not have any GEN-ed variables.", instr),
+                Instruction::Value { args, .. } | Instruction::Effect { args, .. } => {
+                    args.iter().for_each(|arg| {
+                        used.insert(arg.clone());
+                    })
+                }
+                _ => debug!(
+                    "Skipping instr: [{}], as it does not have any GEN-ed variables.",
+                    instr
+                ),
             }
         }
     }
@@ -42,17 +49,22 @@ pub fn dead_code_elimination_pass(func: &mut Function) -> bool {
     for (i, instr) in func.instrs.iter().enumerate() {
         if let bril_rs::Code::Instruction(instr) = instr {
             match instr {
-                Instruction::Value { dest, .. } |
-                Instruction::Constant { dest, .. } => if !used.contains(dest) {
-                    to_delete.insert(i);
-                    changed = true;
-                },
-                _ => debug!("Skipping instr: [{}], as it does not have any KILL-ed variables.", instr),
+                Instruction::Value { dest, .. } | Instruction::Constant { dest, .. } => {
+                    if !used.contains(dest) {
+                        to_delete.insert(i);
+                        changed = true;
+                    }
+                }
+                _ => debug!(
+                    "Skipping instr: [{}], as it does not have any KILL-ed variables.",
+                    instr
+                ),
             }
         }
     }
 
-    func.instrs = func.instrs
+    func.instrs = func
+        .instrs
         .iter()
         .enumerate()
         .filter(|(i, _)| !to_delete.contains(i))
@@ -67,7 +79,7 @@ pub fn dead_code_elimination_pass(func: &mut Function) -> bool {
 /// `dead_code_elimination_pass` until convergence.
 pub fn dead_code_elimination(func: &mut Function) {
     while dead_code_elimination_pass(func) {
-        continue
+        continue;
     }
 }
 
@@ -103,34 +115,39 @@ pub fn dead_store_elimination_pass(bb: &mut BasicBlock) -> bool {
         // Check for use of a variable
         if let bril_rs::Code::Instruction(instr) = instr {
             match instr {
-                Instruction::Value { args, .. } |
-                Instruction::Effect { args, .. } => args.iter().for_each(|arg| {
-                    last_def.remove(arg);
-                }),
-                _ => debug!("Skipping instr: [{}], as it does not have any GEN-ed variables.", instr),
+                Instruction::Value { args, .. } | Instruction::Effect { args, .. } => {
+                    args.iter().for_each(|arg| {
+                        last_def.remove(arg);
+                    })
+                }
+                _ => debug!(
+                    "Skipping instr: [{}], as it does not have any GEN-ed variables.",
+                    instr
+                ),
             }
         }
 
         // Then check for definition of a variable
         if let bril_rs::Code::Instruction(instr) = instr {
             match instr {
-                Instruction::Value { dest, .. } |
-                Instruction::Constant { dest, .. } => {
+                Instruction::Value { dest, .. } | Instruction::Constant { dest, .. } => {
                     if last_def.contains_key(dest) {
                         to_delete.insert(last_def[dest]);
                         changed = true;
                     }
 
-                    last_def.entry(dest)
-                        .and_modify(|v| *v = i)
-                        .or_insert(i);
+                    last_def.entry(dest).and_modify(|v| *v = i).or_insert(i);
                 }
-                _ => debug!("Skipping instr: [{}], as it does not have any KILL-ed variables.", instr),
+                _ => debug!(
+                    "Skipping instr: [{}], as it does not have any KILL-ed variables.",
+                    instr
+                ),
             }
         }
     }
 
-    bb.instrs = bb.instrs
+    bb.instrs = bb
+        .instrs
         .iter()
         .enumerate()
         .filter(|(i, _)| !to_delete.contains(i))
@@ -152,7 +169,7 @@ pub fn dead_store_elimination(func: &mut Function) -> bool {
     }
 
     if changed {
-        func.instrs = BasicBlock::coalesce_basic_blocks(bbs);
+        func.instrs = BasicBlock::flatten(bbs);
     }
 
     changed

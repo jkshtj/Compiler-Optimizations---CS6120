@@ -1,15 +1,18 @@
+mod lvn;
 mod tdce;
 
+extern crate bril_control_flow;
 extern crate bril_rs;
 extern crate tracing;
 extern crate tracing_subscriber;
 
 use bril_rs::load_program_from_read;
+use lvn::run_lvn;
 use std::fs::File;
 use std::process::Command;
-use tracing::{info, Level, debug};
-use tracing_subscriber::FmtSubscriber;
 use tdce::run_tdce_pass;
+use tracing::{debug, info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -43,8 +46,12 @@ fn main() {
     info!("Original({}) : {}", args[2], program);
 
     for func in program.functions.iter_mut() {
+        run_lvn(func);
         run_tdce_pass(func);
     }
 
-    info!("Optimized({}): {}\n==========================\n", args[2], program);
+    info!(
+        "Optimized({}): {}\n==========================\n",
+        args[2], program
+    );
 }
