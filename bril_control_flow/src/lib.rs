@@ -78,4 +78,62 @@ impl BasicBlock {
 
         result
     }
+
+    /// Returns a set of variables in the basic block that are
+    /// read before they are ever written to.
+    ///
+    /// This function exists based on the __ASSUMPTION__ that we're
+    /// only dealing with valid bril programs and that if we're
+    /// seeing a variable in the current basic block, that has not
+    /// already been defined in the basic block, then the variable
+    /// must have been defined in a previous basic block.
+    ///
+    /// An example of such a bril program can be seen below.
+    /// ```bril
+    /// (1) @main {
+    /// (2)  x: int = const 4;
+    /// (3)  jmp .label;
+    /// (4).label:
+    /// (5)  copy1: int = id x;
+    /// (6)  print copy1;
+    /// (7) }
+    /// ```
+    /// The above program consists of 2 basic blocks -the first basic
+    /// block from line 2 to 3 and the second basic block from line 5 to 6.
+    /// `x` is defined in basic block 1 and then read/used without being
+    /// written to first in basic block 2.
+    pub fn read_first(&self) -> HashSet<String> {
+        let mut result = HashSet::new();
+        let mut written_to = HashSet::new();
+
+        for instr in &self.instrs {
+            if let Code::Instruction(instr) = instr {
+                match instr {
+                    Instruction::Constant { dest, .. } => {
+                        written_to.insert(dest.clone());
+                    }
+                    Instruction::Value { args, dest, .. } => {
+                        let read_first: HashSet<String> = args
+                            .iter()
+                            .filter(|&arg| !written_to.contains(arg))
+                            .cloned()
+                            .collect();
+                        result.extend(read_first);
+
+                        written_to.insert(dest.clone());
+                    }
+                    Instruction::Effect { args, .. } => {
+                        let read_first: HashSet<String> = args
+                            .iter()
+                            .filter(|&arg| !written_to.contains(arg))
+                            .cloned()
+                            .collect();
+                        result.extend(read_first);
+                    }
+                }
+            }
+        }
+
+        result
+    }
 }
