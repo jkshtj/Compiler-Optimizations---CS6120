@@ -569,7 +569,7 @@ impl LVNer {
 }
 
 pub fn run_lvn(func: &mut Function) {
-    let mut bbs = BasicBlock::to_basic_blocks(func);
+    let mut bbs = BasicBlock::form_blocks(func);
 
     for bb in &mut bbs {
         let mut lvner = LVNer::new();

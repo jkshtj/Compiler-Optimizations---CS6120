@@ -1,11 +1,116 @@
 extern crate bril_rs;
 
 use bril_rs::{Code, EffectOps, Function, Instruction};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::fmt::{Display, Formatter};
+
+#[derive(Debug, Clone)]
+pub struct ControlFlowGraph {
+    nodes: Vec<BasicBlock>,
+    bb_label_to_index_map: HashMap<String, usize>,
+    successors: Vec<Vec<usize>>,
+    predecessors: Vec<Vec<usize>>,
+}
+
+impl Display for ControlFlowGraph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "=== Basic Blocks ===")?;
+        for bb in self.nodes.iter() {
+            writeln!(f, "{bb}")?;
+        }
+
+        writeln!(f, "=== Predecessors ===")?;
+        for (i, preds) in self.predecessors.iter().enumerate() {
+            writeln!(f, "{} => {:?}", i, preds)?;
+        }
+
+        writeln!(f, "=== Successors ===")?;
+        for (i, succs) in self.successors.iter().enumerate() {
+            writeln!(f, "{} => {:?}", i, succs)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl From<&Function> for ControlFlowGraph {
+    fn from(func: &Function) -> Self {
+        let mut bbs = BasicBlock::form_blocks(func);
+        let bb_label_to_index_map: HashMap<String, usize> = bbs
+            .iter()
+            .enumerate()
+            .map(|(i, bb)| {
+                if let Code::Label { label, .. } = &bb.instrs[0] {
+                    (label.to_owned(), i)
+                } else {
+                    panic!("By the time `get_bb_to_index_map` is called, the first instruction of each basic block must be a `Label`.");
+                }
+            })
+            .collect();
+
+        let mut predecessors = vec![vec![]; bbs.len()];
+        let mut successors = vec![vec![]; bbs.len()];
+
+        for (i, bb) in bbs.iter().enumerate() {
+            if let Code::Label {
+                label: curr_bb_label,
+                ..
+            } = &bb.instrs[0]
+            {
+                let last = bb
+                    .instrs
+                    .last()
+                    .expect("Empty basic block should not have been possible!");
+                match last {
+                    // If last instruction is a jump update the
+                    // successors of the current basic block and
+                    // the predecessors of the target basic block.
+                    Code::Instruction(Instruction::Effect { op, labels, .. })
+                        if op == &EffectOps::Jump || op == &EffectOps::Branch =>
+                    {
+                        for label in labels {
+                            let target_bb_label_index = bb_label_to_index_map[label];
+                            let curr_bb_label_index = bb_label_to_index_map[curr_bb_label];
+                            predecessors[target_bb_label_index].push(curr_bb_label_index);
+                            successors[curr_bb_label_index].push(target_bb_label_index);
+                        }
+                    }
+                    // Else the next basic block is going to be
+                    // a successor of the current basic block
+                    // as the "control" is going to fall through.
+                    _ => {
+                        if i < (bbs.len() - 1) {
+                            predecessors[i + 1].push(i);
+                            successors[i].push(i + 1);
+                        }
+                    }
+                }
+            } else {
+                panic!("First instruction of the basic block was expected to be a label, at this point.");
+            }
+        }
+
+        Self {
+            nodes: bbs,
+            bb_label_to_index_map,
+            successors,
+            predecessors,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
     pub instrs: Vec<Code>,
+}
+
+impl Display for BasicBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for instr in self.instrs.iter() {
+            writeln!(f, "{instr}")?;
+        }
+        Ok(())
+    }
 }
 
 impl BasicBlock {
@@ -13,28 +118,41 @@ impl BasicBlock {
         Self { instrs }
     }
 
-    pub fn to_basic_blocks(func: &Function) -> Vec<BasicBlock> {
+    /// Derives a list of basic blocks from a Bril `Function`.
+    /// Each basic block is assigned a label that is either
+    /// generated or the existing label of the block in the
+    /// concerned Bril function.
+    pub fn form_blocks(func: &Function) -> Vec<BasicBlock> {
         let mut result = vec![];
         let mut sub = vec![];
+        let mut label_number = 0;
 
         for instr in func.instrs.iter() {
             match instr {
-                bril_rs::Code::Instruction(Instruction::Effect { op, .. }) => match op {
-                    EffectOps::Jump | EffectOps::Branch | EffectOps::Return => {
-                        sub.push(instr.clone());
-                        result.push(BasicBlock::new(sub));
-                        sub = vec![];
-                    }
-                    _ => sub.push(instr.clone()),
-                },
+                bril_rs::Code::Instruction(Instruction::Effect { op, .. })
+                    if op == &EffectOps::Jump || op == &EffectOps::Branch =>
+                {
+                    sub.push(instr.clone());
+                    result.push(BasicBlock::new(sub));
+                    sub = vec![];
+                }
                 bril_rs::Code::Label { .. } => {
                     // If this is a label, we need to start a new basic block
                     if !sub.is_empty() {
                         result.push(BasicBlock::new(sub));
                     }
-                    sub = vec![];
+                    sub = vec![instr.clone()];
                 }
-                _ => sub.push(instr.clone()),
+                _ => {
+                    if sub.is_empty() {
+                        sub.push(bril_rs::Code::Label {
+                            label: format!("bb{}", label_number),
+                            pos: None,
+                        });
+                        label_number += 1;
+                    }
+                    sub.push(instr.clone())
+                }
             }
         }
 

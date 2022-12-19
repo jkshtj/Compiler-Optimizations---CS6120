@@ -162,7 +162,7 @@ pub fn dead_store_elimination_pass(bb: &mut BasicBlock) -> bool {
 /// `dead_store_elimination_pass` until convergence.
 pub fn dead_store_elimination(func: &mut Function) -> bool {
     let mut changed = false;
-    let mut bbs = BasicBlock::to_basic_blocks(func);
+    let mut bbs = BasicBlock::form_blocks(func);
 
     for bb in bbs.iter_mut() {
         changed |= dead_store_elimination_pass(bb);

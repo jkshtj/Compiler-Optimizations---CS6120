@@ -13,6 +13,7 @@ use std::process::Command;
 use tdce::run_tdce_pass;
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
+use bril_control_flow::ControlFlowGraph;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -54,14 +55,16 @@ fn main() {
     info!("Original({}) : {}", args[3], program);
 
     for func in program.functions.iter_mut() {
-        run_lvn(func);
-        if run_dce {
-            run_tdce_pass(func);
-        }
+        // run_lvn(func);
+        // if run_dce {
+        //     run_tdce_pass(func);
+        // }
+        let cfg = ControlFlowGraph::from(&*func);
+        println!("{}", cfg);
     }
 
-    info!(
-        "Optimized({}): {}\n==========================\n",
-        args[3], program
-    );
+    // info!(
+    //     "Optimized({}): {}\n==========================\n",
+    //     args[3], program
+    // );
 }
