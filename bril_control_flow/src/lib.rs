@@ -1,15 +1,22 @@
 extern crate bril_rs;
 
-use bril_rs::{Code, EffectOps, Function, Instruction};
+use bril_rs::{Code, EffectOps, Function, Instruction, Argument};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 
+/// Controlflow graph representation of a bril function.
+///
+/// `nodes` - list of basic blocks that make up the control flow graph.
+/// `bb_label_to_index_map` - bb label to the bb index in `nodes`.
+/// `successors` - the list of successors of the basic block at `nodes[i]`, for i ∈ [0, nodes.len()-1]
+/// `predecessors` - the list of predecessors of the basic block at `nodes[i]`, for i ∈ [0, nodes.len()-1]
 #[derive(Debug, Clone)]
 pub struct ControlFlowGraph {
-    nodes: Vec<BasicBlock>,
-    bb_label_to_index_map: HashMap<String, usize>,
-    successors: Vec<Vec<usize>>,
-    predecessors: Vec<Vec<usize>>,
+    pub nodes: Vec<BasicBlock>,
+    pub bb_label_to_index_map: HashMap<String, usize>,
+    pub successors: Vec<Vec<usize>>,
+    pub predecessors: Vec<Vec<usize>>,
+    pub input_args: Vec<Argument>,
 }
 
 impl Display for ControlFlowGraph {
@@ -35,16 +42,12 @@ impl Display for ControlFlowGraph {
 
 impl From<&Function> for ControlFlowGraph {
     fn from(func: &Function) -> Self {
-        let mut bbs = BasicBlock::form_blocks(func);
+        let bbs = BasicBlock::form_blocks(func);
         let bb_label_to_index_map: HashMap<String, usize> = bbs
             .iter()
             .enumerate()
             .map(|(i, bb)| {
-                if let Code::Label { label, .. } = &bb.instrs[0] {
-                    (label.to_owned(), i)
-                } else {
-                    panic!("By the time `get_bb_to_index_map` is called, the first instruction of each basic block must be a `Label`.");
-                }
+                (bb.name().to_owned(), i)
             })
             .collect();
 
@@ -95,6 +98,7 @@ impl From<&Function> for ControlFlowGraph {
             bb_label_to_index_map,
             successors,
             predecessors,
+            input_args: func.args.clone(),
         }
     }
 }
@@ -116,6 +120,20 @@ impl Display for BasicBlock {
 impl BasicBlock {
     pub fn new(instrs: Vec<Code>) -> Self {
         Self { instrs }
+    }
+
+    pub fn name(&self) -> &str {
+        if let Code::Label { label, .. } = &self.instrs[0] {
+            &label
+        } else {
+            panic!("the first instruction of the basic block must be a `Label`.");
+        }
+    }
+
+    pub fn last(&self) -> &Code {
+        // Safe to unwrap here as we never construct empty
+        // basic blocks.
+        self.instrs.last().unwrap()
     }
 
     /// Derives a list of basic blocks from a Bril `Function`.
