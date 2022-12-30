@@ -28,7 +28,7 @@ pub fn meet(predecessors: Vec<DataflowValue>) -> DataflowValue {
 /// def => Set of definitions created in this basic block.
 /// kill => Set of definitions "killed" in this block, i.e., set of variables in `in` that
 ///         were redefined in this basic block.
-pub fn transfer(bb: &BasicBlock, in_set: DataflowValue) -> HashSet<ReachingDefinition> {
+pub fn transfer(bb: &BasicBlock, in_set: DataflowValue) -> DataflowValue {
     let mut in_map = in_set
         .into_iter()
         .map(|def| (def.variable, def.definition))
@@ -54,7 +54,7 @@ pub fn transfer(bb: &BasicBlock, in_set: DataflowValue) -> HashSet<ReachingDefin
         }
     });
 
-    let mut in_minus_killed = in_map
+    let in_minus_killed = in_map
         .into_iter()
         .map(|(var, assignment)| ReachingDefinition {
             variable: var.to_owned(),
@@ -83,7 +83,7 @@ where
     Transfer: Fn(&BasicBlock, DataflowValue) -> DataflowValue,
     InitEntry: FnOnce(&Self) -> DataflowValue,
 {
-    fn get_direction() -> Direction {
+    fn direction() -> Direction {
         Direction::Forward
     }
 }

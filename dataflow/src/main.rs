@@ -6,6 +6,7 @@ extern crate tracing_subscriber;
 
 use bril_control_flow::ControlFlowGraph;
 use bril_rs::load_program_from_read;
+use dataflow::live_variables::find_live_variables;
 use dataflow::reaching_definitions::find_reaching_definitions;
 use std::fs::File;
 use std::process::Command;
@@ -41,7 +42,8 @@ fn main() {
 
     for func in program.functions.iter_mut() {
         let cfg = ControlFlowGraph::from(&*func);
-        find_reaching_definitions(cfg);
+        // find_reaching_definitions(cfg);
+        find_live_variables(cfg);
     }
 
     // info!(

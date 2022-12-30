@@ -1,4 +1,5 @@
 //! Generic dataflow framework.
+pub mod live_variables;
 pub mod reaching_definitions;
 mod sets_util;
 
@@ -120,7 +121,7 @@ where
     InitEntry: FnOnce(&Self) -> Value,
 {
     /// Returns the direction of this dataflow analysis.
-    fn get_direction() -> Direction;
+    fn direction() -> Direction;
 
     /// Generic dataflow solver, that implements the following algorithm -
     /// ```ignore
@@ -151,7 +152,7 @@ where
             vec![Value::default(); self.num_blocks()],
             vec![Value::default(); self.num_blocks()],
         );
-        if Self::get_direction() == Forward {
+        if Self::direction() == Forward {
             in_set[0] = init_entry(self);
         } else {
             out_set[self.num_blocks() - 1] = init_entry(self);
@@ -164,21 +165,42 @@ where
             for bb in worklist.into_iter() {
                 let i = self.index_of(bb);
 
-                // Derive this node's IN set from all its predecessors.
-                in_set[i] = meet(
-                    self.predecessor_indices_of(bb)
-                        .into_iter()
-                        .map(|i| out_set[i].clone())
-                        .collect(),
-                );
+                if Self::direction() == Forward {
+                    // Derive this node's IN set from the OUT sets of
+                    // all its predecessors.
+                    in_set[i] = meet(
+                        self.predecessor_indices_of(bb)
+                            .into_iter()
+                            .map(|i| out_set[i].clone())
+                            .collect(),
+                    );
 
-                let out_set_new = transfer(bb, in_set[i].clone());
+                    let out_set_new = transfer(bb, in_set[i].clone());
 
-                // OUT set for this node has changed. Put all its
-                // successors on the worklist.
-                if out_set_new != out_set[i] {
-                    out_set[i] = out_set_new;
-                    new_worklist.extend(self.successors_of(&bb))
+                    // OUT set for this node has changed. Put all its
+                    // successors on the worklist.
+                    if out_set_new != out_set[i] {
+                        out_set[i] = out_set_new;
+                        new_worklist.extend(self.successors_of(&bb))
+                    }
+                } else {
+                    // Derive this node's OUT set from the IN sets of
+                    // all its successors.
+                    out_set[i] = meet(
+                        self.successor_indices_of(bb)
+                            .into_iter()
+                            .map(|i| in_set[i].clone())
+                            .collect(),
+                    );
+
+                    let in_set_new = transfer(bb, out_set[i].clone());
+
+                    // IN set for this node has changed. Put all its
+                    // predecessors on the worklist.
+                    if in_set_new != in_set[i] {
+                        in_set[i] = in_set_new;
+                        new_worklist.extend(self.predecessors_of(&bb))
+                    }
                 }
             }
 
