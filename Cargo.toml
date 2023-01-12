@@ -4,5 +4,6 @@ members = [
 	"bril_control_flow",
 	"dataflow",
 	"local_optimizations",
+	"dominance",
 ]
 
