@@ -42,8 +42,8 @@ fn main() {
 
     for func in program.functions.iter_mut() {
         let cfg = ControlFlowGraph::from(&*func);
-        // find_reaching_definitions(cfg);
-        find_live_variables(cfg);
+        find_reaching_definitions(cfg);
+        // find_live_variables(cfg);
     }
 
     // info!(

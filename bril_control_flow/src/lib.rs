@@ -103,7 +103,7 @@ impl From<&Function> for ControlFlowGraph {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BasicBlock {
     pub instrs: Vec<Code>,
 }

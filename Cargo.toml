@@ -5,5 +5,7 @@ members = [
 	"dataflow",
 	"local_optimizations",
 	"dominance",
+	"ssa",
+	"bril_util",
 ]
 

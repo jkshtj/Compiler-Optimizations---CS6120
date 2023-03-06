@@ -57,13 +57,13 @@ impl Display for DominanceTree {
 
 impl From<ControlFlowGraph> for DominanceTree {
     fn from(cfg: ControlFlowGraph) -> Self {
-        let dominators = find_dominators(&cfg);
+        let dominate_me = find_dominators(&cfg);
         let mut children = vec![HashSet::new(); cfg.nodes.len()];
 
         for i in 0..cfg.nodes.len() {
             let parent_dominator = cfg.predecessors[i]
                 .iter()
-                .filter(|&pred_idx| dominators[i].contains(pred_idx))
+                .filter(|&pred_idx| dominate_me[i].contains(pred_idx))
                 .cloned()
                 .collect::<Vec<usize>>();
 
@@ -84,11 +84,11 @@ impl From<ControlFlowGraph> for DominanceTree {
 
 /// Returns the dominator sets associated to a bril function.
 pub fn find_dominators(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
-    let mut dominators = vec![(0..cfg.nodes.len()).collect::<HashSet<usize>>(); cfg.nodes.len()];
+    let mut dominate_me = vec![(0..cfg.nodes.len()).collect::<HashSet<usize>>(); cfg.nodes.len()];
 
     // The only possible dominator of the entry block is the
     // entry block itself.
-    dominators[0] = {
+    dominate_me[0] = {
         let mut entry_set = HashSet::new();
         entry_set.insert(0);
         entry_set
@@ -100,7 +100,7 @@ pub fn find_dominators(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
         dom_changed = false;
         // For every node in the cfg except for the entry block.
         for i in 1..cfg.nodes.len() {
-            let mut dominators_of_preds = cfg.predecessors[i].iter().map(|i| &dominators[*i]).fold(
+            let mut dominators_of_preds = cfg.predecessors[i].iter().map(|i| &dominate_me[*i]).fold(
                 HashSet::new(),
                 |acc, curr_pred_dominators| {
                     if acc.is_empty() {
@@ -113,52 +113,74 @@ pub fn find_dominators(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
 
             dominators_of_preds.insert(i);
 
-            if dominators[i] != dominators_of_preds {
+            if dominate_me[i] != dominators_of_preds {
                 dom_changed = true;
-                dominators[i] = dominators_of_preds;
+                dominate_me[i] = dominators_of_preds;
             }
         }
     }
 
-    dominators
+    dominate_me
 }
 
-pub fn print_dominators(cfg: &ControlFlowGraph) {
-    let dominators = find_dominators(cfg);
-    println!("=== Dominators ===");
-    for (i, doms) in dominators.iter().enumerate() {
-        print!("{} => ", cfg.nodes[i].name());
-        for dom in doms.iter() {
-            print!("{}, ", cfg.nodes[*dom].name());
+pub fn print_dominators(cfg: &ControlFlowGraph, dominate_me: bool) {
+    if dominate_me {
+        let dominate_me = find_dominators(cfg);
+        println!("=== Dominate me ===");
+        for (i, dominate_me) in dominate_me.iter().enumerate() {
+            print!("{} => ", cfg.nodes[i].name());
+            for dom in dominate_me.iter() {
+                print!("{}, ", cfg.nodes[*dom].name());
+            }
+            println!();
         }
-        println!("");
+    } else {
+        let dominated_by_me = invert_dominators(find_dominators(cfg));
+        println!("=== Dominated by me ===");
+        for (i, dominated_by_me) in dominated_by_me.iter().enumerate() {
+            print!("{} => ", cfg.nodes[i].name());
+            for dbm in dominated_by_me {
+                print!("{}, ", cfg.nodes[*dbm].name());
+            }
+            println!();
+        }
     }
 }
 
 /// Given the dominator sets for a function, which represent the set of nodes that
 /// ***dominate*** each node, inverts the relations to create information representing the
 /// set of nodes ***dominated by*** each node.
-pub fn invert_dominators(dominators: Vec<HashSet<usize>>) -> Vec<HashSet<usize>> {
-    let mut result = vec![HashSet::new(); dominators.len()];
-    for i in 0..dominators.len() {
-        for &dominator in dominators[i].iter() {
-            result[dominator].insert(i);
+pub fn invert_dominators(dominate_me: Vec<HashSet<usize>>) -> Vec<HashSet<usize>> {
+    let mut dominated_by_me = vec![HashSet::new(); dominate_me.len()];
+    for i in 0..dominate_me.len() {
+        for &dominator in dominate_me[i].iter() {
+            dominated_by_me[dominator].insert(i);
         }
     }
-    result
+    dominated_by_me
 }
 
 /// Returns the dominance frontier sets associated to a bril function.
+///
+/// General idea
+/// ============
+/// Every node on the dominance frontier of a node `n` is -
+///
+/// 1. Either a direct successor of `n` in the CFG, that is not
+/// dominated by `n`.
+///
+/// 2. Or a direct successor `a`, in the CFG, of one of `n`'s children `c`
+/// in the dominator tree, not dominated by `c`.
 pub fn find_dominance_frontiers(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
-    let dominators = find_dominators(cfg);
-    let dominated_by = invert_dominators(dominators);
-    let mut frontiers = vec![HashSet::new(); dominated_by.len()];
+    let dominate_me = find_dominators(cfg);
+    let dominated_by_me = invert_dominators(dominate_me);
+    let mut frontiers = vec![HashSet::new(); dominated_by_me.len()];
 
-    for block in 0..dominated_by.len() {
+    for block in 0..dominated_by_me.len() {
         // The (recursive) successors of a given basic block, i.e.,
         // all basic blocks that a given basic block can reach.
         let mut successors = HashSet::new();
-        for &dominated in dominated_by[block].iter() {
+        for &dominated in dominated_by_me[block].iter() {
             successors.extend(cfg.successors[dominated].iter());
         }
 
@@ -166,7 +188,7 @@ pub fn find_dominance_frontiers(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
         // but is not dominated by A, then it will constitute A's frontiers.
         successors
             .into_iter()
-            .filter(|succ| !dominated_by[block].contains(&succ) || *succ == block)
+            .filter(|succ| !dominated_by_me[block].contains(&succ) || *succ == block)
             .for_each(|succ| {
                 frontiers[block].insert(succ);
             })
