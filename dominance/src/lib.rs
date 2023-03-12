@@ -32,18 +32,23 @@ use std::fmt::{Display, Formatter};
 pub struct DominanceTree {
     pub nodes: Vec<BasicBlock>,
     pub bb_label_to_index_map: HashMap<String, usize>,
-    pub children: Vec<HashSet<usize>>,
+    pub strictly_dominated_by_me: Vec<HashSet<usize>>,
+    pub immediately_dominated_by_me: Vec<HashSet<usize>>,
 }
 
 impl Display for DominanceTree {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "=== Basic Blocks ===")?;
-        for bb in self.nodes.iter() {
-            writeln!(f, "{bb}")?;
+        writeln!(f, "=== Strictly dominated ===")?;
+        for (i, doms) in self.strictly_dominated_by_me.iter().enumerate() {
+            write!(f, "{} => ", self.nodes[i].name())?;
+            for dom in doms.iter() {
+                write!(f, "{}, ", self.nodes[*dom].name())?;
+            }
+            writeln!(f, "")?;
         }
 
-        writeln!(f, "=== Dominance Relations ===")?;
-        for (i, doms) in self.children.iter().enumerate() {
+        writeln!(f, "=== Immediately dominated ===")?;
+        for (i, doms) in self.immediately_dominated_by_me.iter().enumerate() {
             write!(f, "{} => ", self.nodes[i].name())?;
             for dom in doms.iter() {
                 write!(f, "{}, ", self.nodes[*dom].name())?;
@@ -57,27 +62,53 @@ impl Display for DominanceTree {
 
 impl From<ControlFlowGraph> for DominanceTree {
     fn from(cfg: ControlFlowGraph) -> Self {
-        let dominate_me = find_dominators(&cfg);
-        let mut children = vec![HashSet::new(); cfg.nodes.len()];
+        let dominated_by_me = invert_dominators(find_dominators(&cfg));
+        let strictly_dominated_by_me: Vec<HashSet<usize>> = dominated_by_me
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut dbm)| {
+                dbm.remove(&i);
+                dbm
+            })
+            .collect();
 
-        for i in 0..cfg.nodes.len() {
-            let parent_dominator = cfg.predecessors[i]
+        let mut immediately_dominated_by_me = strictly_dominated_by_me.clone();
+
+        // A node immediately dominates only those nodes that it strictly
+        // dominates, but those strictly dominated by it don't strictly
+        // dominate.
+        //
+        // For instance, let's say we have the following nodes in our dominance tree -
+        // ```
+        // 0: {1, 2, 3}
+        // 1: {2, 3}
+        // 2: {}
+        // 3: {}
+        // ```
+        // The node `0` immediately dominated only those nodes that it
+        // strictly dominates, minus the ones that its strictly dominated
+        // children don't strictly dominate:
+        // ```
+        //  {1, 2, 3} - {{2, 3} U {} U {}}
+        // ```
+        for i in 0..strictly_dominated_by_me.len() {
+            // Get a set of all nodes strictly dominated by all nodes
+            // I strictly dominate.
+            let strictly_dominated_2x: HashSet<usize> = strictly_dominated_by_me[i]
                 .iter()
-                .filter(|&pred_idx| dominate_me[i].contains(pred_idx))
-                .cloned()
-                .collect::<Vec<usize>>();
-
-            if parent_dominator.len() > 1 {
-                panic!("A node cannot have more than 1 immediate dominator.");
-            } else if let Some(parent_dominator) = parent_dominator.get(0) {
-                children[*parent_dominator].insert(i);
-            }
+                .flat_map(|sdbm| strictly_dominated_by_me[*sdbm].clone())
+                .collect();
+            immediately_dominated_by_me[i] = immediately_dominated_by_me[i]
+                .difference(&strictly_dominated_2x)
+                .copied()
+                .collect();
         }
 
         DominanceTree {
             nodes: cfg.nodes,
             bb_label_to_index_map: cfg.bb_label_to_index_map,
-            children,
+            strictly_dominated_by_me,
+            immediately_dominated_by_me,
         }
     }
 }
@@ -123,6 +154,19 @@ pub fn find_dominators(cfg: &ControlFlowGraph) -> Vec<HashSet<usize>> {
     dominate_me
 }
 
+/// Given the dominator sets for a function, which represent the set of nodes that
+/// ***dominate*** each node, inverts the relations to create information representing the
+/// set of nodes ***dominated by*** each node.
+pub fn invert_dominators(dominate_me: Vec<HashSet<usize>>) -> Vec<HashSet<usize>> {
+    let mut dominated_by_me = vec![HashSet::new(); dominate_me.len()];
+    for i in 0..dominate_me.len() {
+        for &dominator in dominate_me[i].iter() {
+            dominated_by_me[dominator].insert(i);
+        }
+    }
+    dominated_by_me
+}
+
 pub fn print_dominators(cfg: &ControlFlowGraph, dominate_me: bool) {
     if dominate_me {
         let dominate_me = find_dominators(cfg);
@@ -145,19 +189,6 @@ pub fn print_dominators(cfg: &ControlFlowGraph, dominate_me: bool) {
             println!();
         }
     }
-}
-
-/// Given the dominator sets for a function, which represent the set of nodes that
-/// ***dominate*** each node, inverts the relations to create information representing the
-/// set of nodes ***dominated by*** each node.
-pub fn invert_dominators(dominate_me: Vec<HashSet<usize>>) -> Vec<HashSet<usize>> {
-    let mut dominated_by_me = vec![HashSet::new(); dominate_me.len()];
-    for i in 0..dominate_me.len() {
-        for &dominator in dominate_me[i].iter() {
-            dominated_by_me[dominator].insert(i);
-        }
-    }
-    dominated_by_me
 }
 
 /// Returns the dominance frontier sets associated to a bril function.

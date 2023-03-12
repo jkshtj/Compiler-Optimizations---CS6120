@@ -287,25 +287,18 @@ pub mod to_ssa {
                         .or_insert(PhiNode::new());
 
                     // Make the phi node read the version of `var` at `var`'s
-                    // variable name stack's top.
+                    // stack top.
                     phi_node_for_var_in_succ_bb.add_arg(stack.top(var).to_owned()
                     );
-                    // To the phi node add the basic block label from where the
+                    // To the phi node, add the basic block label from where the
                     // latest version of `var` is coming.
                     phi_node_for_var_in_succ_bb.add_label(cfg.nodes[bb].name().to_owned());
                 }
             }
         }
 
-        let mut immediately_dominated: Vec<usize> = dominance_tree
-            .children[bb]
-            .iter()
-            .copied()
-            .collect();
-        immediately_dominated.sort();
-
         // Recursive rename calls for immediately dominated blocks
-        for child in immediately_dominated {
+        for &child in dominance_tree.immediately_dominated_by_me[bb].iter() {
             rename_variables(cfg, child, dominance_tree, stack, bb_2_phi_node_vars, bb_2_phi_nodes);
         }
 
@@ -350,7 +343,7 @@ mod test {
     use super::*;
     use bril_util::{construct_control_flow_graph_from_ir_file, construct_control_flow_graph_from_ir_string};
     use dominance::{print_dominators, find_dominators, invert_dominators, print_dominance_frontiers, DominanceTree};
-    use to_ssa::SSAVariableNameStack;
+    use to_ssa::{SSAVariableNameStack, PhiNode};
 
     #[test]
     fn var_2_defining_blocks_map() {
@@ -395,21 +388,15 @@ mod test {
 
     #[test]
     fn rename_variables() {
-        let path = "../../examples/test/ssa/if-orig.bril";
+        let path = "../../examples/test/to_ssa/if.bril";
         for mut cfg in construct_control_flow_graph_from_ir_file(path) {
-            let dominance_tree = cfg.clone().into();
+            let dominance_tree: DominanceTree = cfg.clone().into();
             let mut stack = SSAVariableNameStack::new(&cfg);
             let bb_2_phi_node_vars = super::to_ssa::get_phis(&mut cfg);
-            let mut bb_2_phi_nodes = HashMap::new();
+            let mut bb_2_phi_nodes: HashMap<usize, HashMap<String, PhiNode>> = HashMap::new();
 
             super::to_ssa::rename_variables(&mut cfg, 0, &dominance_tree, &mut stack, &bb_2_phi_node_vars, &mut bb_2_phi_nodes);
-            // println!("{}", cfg);
-            // print_dominance_frontiers(&cfg);
-            // println!("{:?}", bb_2_phi_nodes);
-            print_dominators(&cfg, false);
-
             super::to_ssa::insert_phis(&mut cfg, bb_2_phi_nodes);
-
             println!("{}", cfg);
         }
     }
