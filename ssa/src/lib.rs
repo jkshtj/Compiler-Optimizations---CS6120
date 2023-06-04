@@ -335,7 +335,49 @@ mod from_ssa {
     use bril_rs::EffectOps;
 
     pub fn from_ssa(mut cfg: ControlFlowGraph) -> ControlFlowGraph {
-        let mut blocks_for_copy: HashMap<usize, (String, String)> = HashMap::new();
+        let phi_predecessor_blocks = get_phi_predecessor_blocks(&mut cfg);
+        insert_copies_into_phi_predecessor_blocks(phi_predecessor_blocks, &mut cfg);
+        cfg
+    }
+
+    fn insert_copies_into_phi_predecessor_blocks(phi_predecessor_blocks: HashMap<usize, Vec<PhiNodeCopy>>, cfg: &mut ControlFlowGraph) {
+        // Insert copies at the end of the blocks that
+        // comprised the values of the phi-nodes in this
+        // block.
+        for (bb_index, phi_node_copies) in phi_predecessor_blocks {
+            for (dest, src) in phi_node_copies {
+                if let Some(Code::Instruction(Instruction::Effect {op, ..})) = cfg.nodes[bb_index].instrs.last() {
+                    if *op == EffectOps::Branch || *op == EffectOps::Jump {
+                        let index = cfg.nodes[bb_index].instrs.len() - 1;
+                        cfg.nodes[bb_index].instrs.insert(index, Code::Instruction(Instruction::Value {
+                            args: vec![src],
+                            dest,
+                            funcs: vec![],
+                            labels: vec![],
+                            op: ValueOps::Id,
+                            pos: None,
+                            op_type: Type::Int
+                        }));
+                    }
+                } else {
+                    cfg.nodes[bb_index].instrs.push(Code::Instruction(Instruction::Value {
+                        args: vec![src],
+                        dest,
+                        funcs: vec![],
+                        labels: vec![],
+                        op: ValueOps::Id,
+                        pos: None,
+                        op_type: Type::Int
+                    }));
+                }
+            }
+        }
+    }
+
+    type PhiNodeCopy = (/* Destination */ String, /* Source */ String);
+    fn get_phi_predecessor_blocks(cfg: &mut ControlFlowGraph) -> HashMap<usize, Vec<PhiNodeCopy>> {
+        let mut phi_predecessor_blocks: HashMap<usize, Vec<(String, String)>> = HashMap::new();
+
         for bb in cfg.nodes.iter_mut() {
             // Collect all blocks at the end of which a copy
             // needs to be inserted.
@@ -345,7 +387,14 @@ mod from_ssa {
                         args.iter()
                             .zip(labels)
                             .for_each(|(src, bb_label)| {
-                                blocks_for_copy.insert(cfg.bb_label_to_index_map[bb_label], (dest.clone(), src.clone()));
+                                // Ignore copies that will contribute an
+                                // undefined value to corresponding phi node.
+                                if src != "__undefined" {
+                                    phi_predecessor_blocks
+                                        .entry(cfg.bb_label_to_index_map[bb_label])
+                                        .or_default()
+                                        .push((dest.clone(), src.clone()));
+                                }
                             });
                     }
                 }
@@ -359,36 +408,8 @@ mod from_ssa {
             });
         }
 
-        for (bb_index, (dest, src)) in blocks_for_copy {
-            if let Some(Code::Instruction(Instruction::Effect {op, ..})) = cfg.nodes[bb_index].instrs.last() {
-                if *op == EffectOps::Branch || *op == EffectOps::Jump {
-                    let index = cfg.nodes[bb_index].instrs.len() - 2;
-                    cfg.nodes[bb_index].instrs.insert(index, Code::Instruction(Instruction::Value {
-                        args: vec![src],
-                        dest,
-                        funcs: vec![],
-                        labels: vec![],
-                        op: ValueOps::Id,
-                        pos: None,
-                        op_type: Type::Int
-                    }));
-                }
-            } else {
-                cfg.nodes[bb_index].instrs.push(Code::Instruction(Instruction::Value {
-                    args: vec![src],
-                    dest,
-                    funcs: vec![],
-                    labels: vec![],
-                    op: ValueOps::Id,
-                    pos: None,
-                    op_type: Type::Int
-                }));
-            }
-        }
-
-        cfg
+        phi_predecessor_blocks
     }
-
 }
 
 #[cfg(test)]
@@ -456,35 +477,24 @@ mod test {
 
     #[test]
     fn to_ssa() {
-        let non_ssa_ir_file_path = "../../examples/test/to_ssa/loop.bril";
+        let non_ssa_ir_file_path = "../../examples/test/to_ssa/while.bril";
         let non_ssa_cfgs = construct_control_flow_graph_from_ir_file(non_ssa_ir_file_path);
-        let ssa_ir_file_path = "../../examples/test/to_ssa/if.out";
-        let ssa_cfgs = construct_control_flow_graph_from_ir_file(ssa_ir_file_path);
 
-        // Convert to ssa
-        for (non_ssa_cfg, ssa_cfg) in non_ssa_cfgs.into_iter().zip(ssa_cfgs) {
-            let modified_to_ssa_cfg = super::to_ssa::to_ssa(non_ssa_cfg);
-
-            println!("Modified to SSA CFG: {}.", modified_to_ssa_cfg);
-            // println!();
-            // println!("Existing SSA CFG: {}.", ssa_cfg);
+        for  non_ssa_cfg in non_ssa_cfgs {
+            let to_ssa_cfg = super::to_ssa::to_ssa(non_ssa_cfg);
+            println!("To SSA CFG: {}.", to_ssa_cfg);
         }
     }
 
     #[test]
     fn from_ssa() {
-        let non_ssa_ir_file_path = "../../examples/test/to_ssa/loop.bril";
+        let non_ssa_ir_file_path = "../../examples/test/ssa_roundtrip/while.bril";
         let non_ssa_cfgs = construct_control_flow_graph_from_ir_file(non_ssa_ir_file_path);
-        let ssa_ir_file_path = "../../examples/test/to_ssa/if.out";
-        let ssa_cfgs = construct_control_flow_graph_from_ir_file(ssa_ir_file_path);
 
-        // Convert to ssa
-        for (non_ssa_cfg, ssa_cfg) in non_ssa_cfgs.into_iter().zip(ssa_cfgs) {
-            let modified_to_ssa_cfg = super::to_ssa::to_ssa(non_ssa_cfg);
-            let final_from_ssa_cfg = super::from_ssa::from_ssa(modified_to_ssa_cfg);
-            println!("Modified to SSA CFG: {}.", final_from_ssa_cfg);
-            // println!();
-            // println!("Existing SSA CFG: {}.", ssa_cfg);
+        for non_ssa_cfg in non_ssa_cfgs {
+            let to_ssa_cfg = super::to_ssa::to_ssa(non_ssa_cfg);
+            let from_ssa_cfg = super::from_ssa::from_ssa(to_ssa_cfg);
+            println!("From SSA CFG: {}.", from_ssa_cfg);
         }
     }
 }
