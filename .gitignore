@@ -1,2 +1,5 @@
 /target/
 .idea
+build/
+.vscode
+.DS_Store
