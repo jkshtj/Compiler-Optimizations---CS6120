@@ -21,6 +21,55 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 # Enable compile_commands.json generation
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Get all source files
+file(GLOB_RECURSE ALL_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/*.h
+    ${CMAKE_SOURCE_DIR}/lib/*.cpp
+    ${CMAKE_SOURCE_DIR}/lib/*.h
+    ${CMAKE_SOURCE_DIR}/include/*.h
+    ${CMAKE_SOURCE_DIR}/include/*.hpp
+    ${CMAKE_SOURCE_DIR}/test/*.cpp
+    ${CMAKE_SOURCE_DIR}/test/*.h
+)
+
+# Clang-tidy configuration
+find_program(CLANG_TIDY_EXE NAMES "clang-tidy" PATHS /opt/homebrew/opt/llvm/bin)
+if(CLANG_TIDY_EXE)
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+
+    add_custom_target(check
+        COMMAND ${CLANG_TIDY_EXE} ${ALL_SOURCE_FILES} -- -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/lib -std=c++23
+        COMMENT "Running clang-tidy on all source files"
+        VERBATIM
+    )
+else()
+    message(WARNING "clang-tidy not found!")
+endif()
+
+# Clang-format configuration
+find_program(CLANG_FORMAT_EXE NAMES "clang-format" PATHS /opt/homebrew/opt/llvm/bin)
+if(CLANG_FORMAT_EXE)
+    message(STATUS "clang-format found: ${CLANG_FORMAT_EXE}")
+    
+    # Add format target
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${ALL_SOURCE_FILES}
+        COMMENT "Formatting code with clang-format"
+        VERBATIM
+    )
+    
+    # # Add format-check target
+    # add_custom_target(format-check
+    #     COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${ALL_SOURCE_FILES}
+    #     COMMENT "Checking code formatting with clang-format"
+    #     VERBATIM
+    # )
+else()
+    message(WARNING "clang-format not found!")
+endif()
+
 enable_testing()
 
 # External packages

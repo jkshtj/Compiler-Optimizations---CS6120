@@ -1,9 +1,11 @@
+#pragma once
+
 #include <algorithm>
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <string>
-#include <vector>
 #include <variant>
+#include <vector>
 
 #include "Enum.h"
 
@@ -12,16 +14,16 @@ using json = nlohmann::json;
 /////////////////////////////////////////
 /////////////// Locations ///////////////
 /////////////////////////////////////////
-using Position = std::tuple<int,int>;
+using Position = std::tuple<int, int>;
 
 struct Loc {
-    Position start;
-    Position end;
+  Position start;
+  Position end;
 };
 
 struct LocWithFile {
-    Loc loc;
-    std::string file;
+  Loc loc;
+  std::string file;
 };
 
 struct EmptyLoc {};
@@ -46,28 +48,28 @@ using Value = template_enum::Enum<int64_t, bool>;
 ////////////// Instructions //////////////
 //////////////////////////////////////////
 struct ConstantInstr {
-    std::string dest;
-    Type type;
-    Value value;
-    Location location;
+  std::string dest;
+  Type type;
+  Value value;
+  Location location;
 };
 
 struct ValueInstr {
-    std::string op;
-    std::string dest;
-    Type type;
-    std::vector<std::string> args;
-    std::vector<std::string> funcs;
-    std::vector<std::string> labels;
-    Location location;
+  std::string op;
+  std::string dest;
+  Type type;
+  std::vector<std::string> args;
+  std::vector<std::string> funcs;
+  std::vector<std::string> labels;
+  Location location;
 };
 
 struct EffectInstr {
-    std::string op;
-    std::vector<std::string> args;
-    std::vector<std::string> funcs;
-    std::vector<std::string> labels;
-    Location location;
+  std::string op;
+  std::vector<std::string> args;
+  std::vector<std::string> funcs;
+  std::vector<std::string> labels;
+  Location location;
 };
 
 using Instruction = template_enum::Enum<ConstantInstr, ValueInstr, EffectInstr>;
@@ -76,19 +78,19 @@ using Instruction = template_enum::Enum<ConstantInstr, ValueInstr, EffectInstr>;
 //////////////// Argument ////////////////
 //////////////////////////////////////////
 struct Argument {
-    std::string name;
-    Type type;
+  std::string name;
+  Type type;
 };
 
 //////////////////////////////////////////
 //////////////// Function ////////////////
 //////////////////////////////////////////
 struct Function {
-    std::string name;
-    std::vector<Argument> arguments;
-    Type type;
-    std::vector<Instruction> instrs;
-    Location location;
+  std::string name;
+  std::vector<Argument> arguments;
+  Type type;
+  std::vector<Instruction> instrs;
+  Location location;
 };
 
 //////////////////////////////////////////
@@ -96,7 +98,8 @@ struct Function {
 //////////////////////////////////////////
 class Program {
 public:
-    Program(json j);
+  Program(json &j);
+
 private:
-    std::vector<Function> functions;
+  std::vector<Function> functions;
 };
