@@ -20,10 +20,10 @@ Type typeFromStr(const std::string_view str) {
 } // namespace
 
 namespace std {
-template <> struct std::formatter<Location> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+template<> struct std::formatter<Location> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Location &location, std::format_context &ctx) const {
+  auto format(const Location &location, std::format_context& ctx) const {
     return location.match(
         [&](const EmptyLoc &) { return std::format_to(ctx.out(), "EmptyLoc"); },
         [&](const Loc &loc) {
@@ -38,9 +38,9 @@ template <> struct std::formatter<Location> {
   }
 };
 
-template <> struct std::formatter<Type> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
-  auto format(const Type &type, std::format_context &ctx) const {
+template<> struct std::formatter<Type> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const Type &type, std::format_context& ctx) const {
     return type.match(
         [&](const VoidType &) { return std::format_to(ctx.out(), "VoidType"); },
         [&](const IntType &) { return std::format_to(ctx.out(), "IntType"); },
@@ -50,10 +50,10 @@ template <> struct std::formatter<Type> {
   }
 };
 
-template <> struct std::formatter<Value> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+template<> struct std::formatter<Value> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Value &value, std::format_context &ctx) const {
+  auto format(const Value &value, std::format_context& ctx) const {
     return value.match(
         [&](int64_t v) {
           return std::format_to(ctx.out(), "Value<int64_t>({})", v);
@@ -64,10 +64,10 @@ template <> struct std::formatter<Value> {
   }
 };
 
-template <> struct std::formatter<Instruction> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+template<> struct std::formatter<Instruction> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Instruction &instr, std::format_context &ctx) const {
+  auto format(const Instruction &instr, std::format_context& ctx) const {
     return instr.match(
         [&](const ConstantInstr &c) {
           return std::format_to(
@@ -90,34 +90,48 @@ template <> struct std::formatter<Instruction> {
   }
 };
 
-template <> struct std::formatter<Argument> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+template<> struct std::formatter<Label> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Argument &arg, std::format_context &ctx) const {
+  auto format(const Label& arg, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "Label {{ name: {}, location: {} }}",
+                          arg.name, arg.location);
+  }
+};
+
+template<> struct std::formatter<Code> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const Code& arg, std::format_context& ctx) const {
+    return arg.match(
+      [&](const Instruction& instr) {
+        return std::format_to(ctx.out(), "{}", instr);
+      },
+      [&](const Label& label) {
+        return std::format_to(ctx.out(), "{}", label);
+      }
+    );
+  }
+};
+
+template<> struct std::formatter<Argument> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const Argument& arg, std::format_context& ctx) const {
     return std::format_to(ctx.out(), "Argument {{ name: {}, type: {} }}",
                           arg.name, arg.type);
   }
 };
 
 template <typename T>
-  requires requires(std::format_context &ctx, const T &t) {
+  requires requires(std::format_context& ctx, const T& t) {
     std::print("{}", t);
   }
 // requires std::formattable<T, char>
 struct std::formatter<std::vector<T>> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const std::vector<T> &vec, std::format_context &ctx) const {
-    // stringstream ss;
-
-    // ss << "[";
-    // for (auto& toPrint : vec) {
-    //     ss << std::format("{}, ", toPrint);
-    // }
-    // ss << "]";
-
-    // return std::format_to(ctx.out(), "{}", ss.str());
-
+  auto format(const std::vector<T>& vec, std::format_context& ctx) const {
     auto out = std::format_to(ctx.out(), "[");
     for (auto &toPrint : vec) {
       out = std::format_to(out, "{}", toPrint);
@@ -126,10 +140,10 @@ struct std::formatter<std::vector<T>> {
   }
 };
 
-template <> struct std::formatter<Function> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+template<> struct std::formatter<Function> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Function &func, std::format_context &ctx) const {
+  auto format(const Function& func, std::format_context& ctx) const {
     return std::format_to(
         ctx.out(),
         "Function {{ name: {}, arguments: {}, type: {}, instrs: {} }}",
@@ -138,31 +152,36 @@ template <> struct std::formatter<Function> {
 };
 } // namespace std
 
-Program::Program(json &j) {
-  for (const auto &func : j["functions"]) {
+Program::Program(json& j) {
+  for (const auto& func : j["functions"]) {
     Function function{
         .name = func["name"],
         .arguments =
-            func.value("args", std::vector<std::string>{}) |
-            std::views::transform([](const json &arg) {
+            func.value("args", std::vector<json>{}) |
+            std::views::transform([](const json& arg) {
               return Argument{.name = arg["name"],
                               .type = typeFromStr(
                                   arg["type"].get_ref<const std::string &>())};
             }) |
             std::ranges::to<std::vector<Argument>>(),
         .type = typeFromStr(func.value("type", "")),
-        .instrs = std::vector<Instruction>{},
+        .instrs = std::vector<Code>{},
         .location = EmptyLoc{}};
 
     for (const auto &instr : func["instrs"]) {
-      auto opName = instr["op"];
+      auto opName = instr.value("op", "");
       auto args = instr.value("args", std::vector<std::string>{});
       auto funcs = instr.value("funcs", std::vector<std::string>{});
       auto labels = instr.value("labels", std::vector<std::string>{});
       auto dest = instr.value("dest", "");
       auto type = typeFromStr(instr.value("type", ""));
 
-      auto newInstr = [&]() -> Instruction {
+      auto newCode = [&]() -> Code {
+        if (opName.empty()) {
+          return Label{.name = instr["label"],
+                       .location = EmptyLoc{}};
+        }
+
         if (opName == "const") {
           return ConstantInstr{.dest = dest,
                                .type = type,
@@ -189,10 +208,10 @@ Program::Program(json &j) {
                            .location = EmptyLoc{}};
       }();
 
-      function.instrs.push_back(newInstr);
+      function.instrs.push_back(newCode);
     }
 
-    std::println("Function: {}", function);
+    // std::println("Function: {}", function);
     functions.push_back(function);
   }
 }

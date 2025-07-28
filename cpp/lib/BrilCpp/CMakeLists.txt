@@ -1,5 +1,6 @@
 add_library(brilcpp
     Core.cpp
+    ControlFlowGraph.cpp
 )
 
 target_include_directories(brilcpp PUBLIC 
