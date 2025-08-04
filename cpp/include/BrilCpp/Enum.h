@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <variant>
 
 namespace template_enum {
@@ -17,18 +18,20 @@ public:
     return std::holds_alternative<T>(data);
   }
 
-  template <typename T> T &as() {
-    if (!is<T>()) {
-      throw std::runtime_error("Invalid enum variant access");
+  template <typename T> std::optional<T> tryAs(this auto &&self) {
+    if (!self.template is<T>()) {
+      return std::nullopt;
     }
-    return std::get<T>(data);
+
+    return std::get<T>(self.data);
   }
 
-  template <typename T> const T &as() const {
-    if (!is<T>()) {
+  template <typename T> T as(this auto &&self) {
+    if (!self.template is<T>()) {
       throw std::runtime_error("Invalid enum variant access");
     }
-    return std::get<T>(data);
+
+    return std::get<T>(self.data);
   }
 
   template <typename Self, typename... Visitors>
