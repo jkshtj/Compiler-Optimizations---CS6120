@@ -2,6 +2,7 @@
 
 #include <format>
 #include <print>
+#include <ranges>
 
 #include "Core.h"
 #include "ControlFlowGraph.h"
@@ -59,11 +60,11 @@ namespace std {
     auto format(const Instruction &instr, std::format_context& ctx) const {
       return instr.match(
           [&](const ConstantInstr &c) {
-            constexpr auto s = R"({} : {} = {})";
+            constexpr auto s = R"({}: {} = {})";
             return std::format_to(ctx.out(), s, c.dest, c.type, c.value);
           },
           [&](const ValueInstr &v) {
-            constexpr auto s = R"({} : {} = {}, args: {}, funcs: {}, labels: {})";
+            constexpr auto s = R"({}: {} = {}, args: {}, funcs: {}, labels: {})";
             return std::format_to(ctx.out(), s, v.dest, v.type, v.op, v.args, v.funcs, v.labels);
           },
           [&](const EffectInstr &e) {
@@ -101,7 +102,7 @@ namespace std {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Argument& arg, std::format_context& ctx) const {
-      constexpr auto s = R"({} : {})";
+      constexpr auto s = R"({}: {})";
       return std::format_to(ctx.out(), s, arg.name, arg.type);
     }
   };
@@ -114,12 +115,18 @@ struct std::formatter<std::vector<T>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   auto format(const std::vector<T>& vec, std::format_context& ctx) const {
-    auto out = std::format_to(ctx.out(), "[");
-    constexpr auto s = R"({}, )";
-    for (auto &toPrint : vec) {
-      out = std::format_to(out, s, toPrint);
+    constexpr auto itemFormat = R"({})";
+    constexpr auto commaWithNewLine = R"(,
+          )";
+    
+    for (auto [index, toPrint] : std::views::zip(std::views::iota(0), vec)) {
+      auto out = std::format_to(ctx.out(), itemFormat, toPrint);
+      if (index < vec.size()-1) {
+        std::format_to(out, commaWithNewLine);
+      }
     }
-    return std::format_to(out, "]");
+    
+    return ctx.out();
   }
 };
 
@@ -127,7 +134,9 @@ struct std::formatter<std::vector<T>> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
     auto format(const BasicBlock& block, std::format_context& ctx) const {
-      constexpr auto s = R"({} : {})";
+      constexpr auto s = R"(
+      {}: 
+          {})";
       return std::format_to(ctx.out(), s, block.label, block.instrs);
     }
   };
@@ -136,10 +145,12 @@ struct std::formatter<std::vector<T>> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
     auto format(const ControlFlowGraph& cfg, std::format_context& ctx) const {
-      constexpr auto s = R"(ControlFlowGraph {{ 
-        arguments: {}, 
-        blocks: {} 
-      }})";
+      constexpr auto s = R"(
+ControlFlowGraph {{ 
+  arguments: {}, 
+  blocks: {} 
+}}
+)";
       return std::format_to(ctx.out(), s, cfg.arguments, cfg.blocks);
     }
   };
