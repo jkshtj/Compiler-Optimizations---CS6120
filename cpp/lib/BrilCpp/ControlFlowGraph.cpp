@@ -7,7 +7,12 @@
 
 std::vector<BasicBlock> BasicBlock::getBlocksFor(const Function &function) {
   std::vector<BasicBlock> result;
-  BasicBlock currBlock{.label = "entry", .instrs = {}};
+  
+  std::string entryLabel = "entry";
+  if (auto label = function.instrs[0].tryAs<Label>()) {
+    entryLabel = (*label).name;
+  }
+  BasicBlock currBlock{.label = entryLabel, .instrs = {}};
 
   auto afterFirstLabel =
       function.instrs | std::views::drop_while([](auto code) {
@@ -55,7 +60,7 @@ ControlFlowGraph::ControlFlowGraph(const Function &function)
     if (currBlockIndex < blocks.size() - 1) {
       auto targetBlockIndex = currBlockIndex + 1;
       successors[currBlockIndex].push_back(targetBlockIndex);
+      predecessors[targetBlockIndex].push_back(currBlockIndex);
     }
-    predecessors[currBlockIndex].push_back(currBlockIndex - 1);
   }
 }

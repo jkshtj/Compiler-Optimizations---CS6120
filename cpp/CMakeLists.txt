@@ -12,6 +12,8 @@ set(CMAKE_RANLIB /opt/homebrew/opt/llvm/bin/llvm-ranlib CACHE STRING "" FORCE)
 cmake_minimum_required(VERSION 3.13.4)
 project(CPPBasic LANGUAGES CXX C)
 
+add_compile_options(-g)
+
 set(LLVM_PREFIX "/opt/homebrew/opt/llvm")
 add_link_options("-L${LLVM_PREFIX}/lib/c++")
 
