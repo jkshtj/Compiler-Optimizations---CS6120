@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <iterator>
 #include <ranges>
 #include <unordered_set>
 #include <vector>
@@ -5,7 +7,35 @@
 #include "ControlFlowGraph.h"
 #include "Dominance.h"
 
-DominanceTree::DominanceTree(ControlFlowGraph cfg) {}
+// template<typename T>
+// void print_type() {
+//     std::println("Type is: {}", __PRETTY_FUNCTION__); // GCC/Clang
+//     // or std::println("Type is: {}", __FUNCSIG__); // MSVC
+// }
+
+DominanceTree::DominanceTree(ControlFlowGraph cfg) : nodes(cfg.blocks), blockLabel2Index(cfg.blockLabel2Index) {
+  DominanceAnalysis dominanceAnalysis = cfg;
+  auto dominators = dominanceAnalysis.findDominators();
+  immediatelyDominatedByMe = std::vector(cfg.blocks.size(), std::unordered_set<unsigned>());
+
+  for (auto zipped : std::views::zip(std::views::iota(0), dominators)) {
+    auto& [blockIndex, itsDominators] = zipped;
+    auto& itsPredecessors = cfg.predecessors[blockIndex];
+    
+    // Find the sinle-point intersection of predecessors and dominators, there should only be zero or one.
+    auto intersection = itsPredecessors | std::views::filter([&](const auto& predecessor) {
+                                            return itsDominators.contains(predecessor);
+                                          });
+    
+    auto numImmediateDominators = std::ranges::distance(intersection);
+
+    assert(numImmediateDominators <= 1 && "Only a zero or one predecessor blocks can be a basic block's dominator!");
+    
+    if (numImmediateDominators) {
+      immediatelyDominatedByMe[intersection.front()].insert(blockIndex);
+    }
+  }
+}
 
 std::vector<std::unordered_set<unsigned>> DominanceAnalysis::findDominators() {
   // At the start all blocks will be dominated by all other blocks

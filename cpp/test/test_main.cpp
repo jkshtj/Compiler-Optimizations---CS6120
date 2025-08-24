@@ -319,6 +319,67 @@ TEST(TypeVerificationTests, VerifyDominators) {
   });
 }
 
+TEST(TypeVerificationTests, VerifyDominanceTree) {
+  std::string filePath = "../bril/examples/test/dom/loopcond.bril";
+
+  std::println("Reading Bril program from input file: {}", filePath);
+
+  // Test that we can load the file and create a Program from it
+  EXPECT_NO_THROW({
+    json j = brilFromFile(filePath);
+    Program program(j);
+
+    std::println("Program has {} functions.", program.functions.size());
+
+    for (auto function : program.functions) {
+      ControlFlowGraph cfg(function);
+      DominanceTree tree(cfg);
+
+      /*
+        {
+          "body": [
+            "endif",
+            "then"
+          ],
+          "endif": [],
+          "entry": [
+            "loop"
+          ],
+          "exit": [],
+          "loop": [
+            "body",
+            "exit"
+          ],
+          "then": []
+        }
+      */
+
+      // .entry
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["entry"]].size(), 1); // .entry imm dominates .loop
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["entry"]].contains(tree.blockLabel2Index["loop"]), true); // .entry imm dominates .loop
+
+      // .loop
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["loop"]].size(), 2); // .loop imm dominates .body and .exit
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["loop"]].contains(tree.blockLabel2Index["body"]), true); // .loop imm dominates .body
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["loop"]].contains(tree.blockLabel2Index["exit"]), true); // .loop imm dominates .exit
+            
+      // .body
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["body"]].size(), 2); // .body imm dominates .then and .endif
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["body"]].contains(tree.blockLabel2Index["then"]), true); // .body imm dominates .then
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["body"]].contains(tree.blockLabel2Index["endif"]), true); // .body imm dominates .endif
+
+      // .then
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["then"]].size(), 0); // .then imm dominates no one
+
+      // .endif
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["endif"]].size(), 0); // .endif imm dominates no one
+
+      // .exit
+      EXPECT_EQ(tree.immediatelyDominatedByMe[tree.blockLabel2Index["exit"]].size(), 0); // .exit imm dominates no one
+    }
+  });
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -31,20 +31,18 @@
 /// relationships in an entire function. The recursive children of a given node
 /// in a tree are the nodes that that node dominates.
 struct DominanceTree {
+  DominanceTree(ControlFlowGraph cfg);
+
   std::vector<BasicBlock> nodes;
   std::unordered_map<std::string, unsigned> blockLabel2Index;
-  std::vector<std::unordered_set<unsigned>> strictlyDominatedByMe;
   std::vector<std::unordered_set<unsigned>> immediatelyDominatedByMe;
-
-  DominanceTree(ControlFlowGraph cfg);
 };
 
 struct DominanceAnalysis {
-  ControlFlowGraph cfg;
-  DominanceTree dominanceTree;
-
-  DominanceAnalysis(ControlFlowGraph cfg): cfg(cfg), dominanceTree(cfg) {}
-
+  DominanceAnalysis(ControlFlowGraph cfg): cfg(cfg) {}
+  
   /// Returns the dominator sets associated to a bril function.
   std::vector<std::unordered_set<unsigned>> findDominators();
+
+  ControlFlowGraph cfg;
 };

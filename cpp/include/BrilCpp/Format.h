@@ -6,6 +6,7 @@
 
 #include "Core.h"
 #include "ControlFlowGraph.h"
+#include "Dominance.h"
 
 namespace std {
   template<> struct std::formatter<Location> {
@@ -163,6 +164,30 @@ ControlFlowGraph {{
           ctx.out(),
           "Function {{ name: {}, arguments: {}, type: {}, instrs: {} }}",
           func.name, func.arguments, func.type, func.instrs);
+    }
+  };
+
+  template<> struct std::formatter<DominanceTree> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(const DominanceTree& tree, std::format_context& ctx) const {
+      std::format_to(ctx.out(), "Dominance Tree:\n");
+      for (auto i = 0; i < tree.immediatelyDominatedByMe.size(); i++) {
+        auto& dominator = tree.nodes[i].label;
+
+        if (tree.immediatelyDominatedByMe[i].empty()) {
+          std::format_to(ctx.out(), "{}: []\n", dominator);
+          continue;
+        }
+        
+        std::format_to(ctx.out(), "{}: [", dominator);
+        for (auto dominated : tree.immediatelyDominatedByMe[i]) {
+          std::format_to(ctx.out(), "{}, ", tree.nodes[dominated].label);
+        }
+        std::format_to(ctx.out(), "]\n");
+      }
+
+      return ctx.out();
     }
   };
 } // namespace std
