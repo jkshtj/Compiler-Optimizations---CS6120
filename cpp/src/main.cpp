@@ -63,33 +63,27 @@ int main() {
   std::println("Program has {} functions.", program.functions.size());
 
   for (auto function : program.functions) {
-    ControlFlowGraph cfg(function);
+    for (auto instr : function.instrs) {
+      // instr.match(
+      //   [&](const Label& label) { std::println("LABEL ====> {}", label); },
+      //   [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
+      // );
 
-    DominanceTree tree(cfg);
-    std::println("{}", tree);
-    
-    // std::println("{}", cfg);
-    
-    // std::println("Successors and predecessors for each block: ");
+      // instr | Overload {
+      //           [&](const Label& label) { std::println("LABEL ====> {}", label); }, 
+      //           [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
+      //         };
 
-    // for (auto i = 0; i < cfg.blocks.size(); i++) {
-    //   auto block = cfg.blocks[i];
-    //   auto label = block.label;
+      // instr | MATCH(
+      //   [&](const Label& label) { std::println("LABEL ====> {}", label); }, 
+      //   [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
+      // );
 
-    //   std::print("Predecessors: [");
-    //   for (auto pred : cfg.predecessors[i]) {
-    //     auto predLabel = cfg.blocks[pred].label;
-    //     std::print("{}, ", predLabel);
-    //   }
-    //   std::println("]");
-
-    //   std::print("Successors: [");
-    //   for (auto succ : cfg.successors[i]) {
-    //     auto succLabel = cfg.blocks[succ].label;
-    //     std::print("{}, ", succLabel);
-    //   }
-    //   std::println("]");
-    // }
+      instr | Match {
+        [&](const Label& label) { std::println("LABEL ====> {}", label); }, 
+        [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
+      };
+    }
   }
 }
 

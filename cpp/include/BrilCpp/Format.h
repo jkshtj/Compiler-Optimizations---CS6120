@@ -7,35 +7,38 @@
 #include "Core.h"
 #include "ControlFlowGraph.h"
 #include "Dominance.h"
+#include "Enum.h"
 
 namespace std {
   template<> struct std::formatter<Location> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Location &location, std::format_context& ctx) const {
-      return location.match(
-          [&](const EmptyLoc &) { return std::format_to(ctx.out(), "EmptyLoc"); },
-          [&](const Loc &loc) {
-            return std::format_to(ctx.out(), "Loc {{ start: {}, end: {} }}",
-                                  loc.start, loc.end);
-          },
-          [&](const LocWithFile &locWithFile) {
-            return std::format_to(
-                ctx.out(), "LocWithFile {{ start: {}, end: {}, file: {} }}",
-                locWithFile.loc.start, locWithFile.loc.end, locWithFile.file);
-          });
+      return location | Match {
+        [&](const EmptyLoc &) { return std::format_to(ctx.out(), "EmptyLoc"); },
+        [&](const Loc &loc) {
+          return std::format_to(ctx.out(), "Loc {{ start: {}, end: {} }}",
+                                loc.start, loc.end);
+        },
+        [&](const LocWithFile &locWithFile) {
+          return std::format_to(
+              ctx.out(), "LocWithFile {{ start: {}, end: {}, file: {} }}",
+              locWithFile.loc.start, locWithFile.loc.end, locWithFile.file);
+        }
+      };
     }
   };
   
   template<> struct std::formatter<Type> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
     auto format(const Type &type, std::format_context& ctx) const {
-      return type.match(
-          [&](const VoidType &) { return std::format_to(ctx.out(), "VoidType"); },
-          [&](const IntType &) { return std::format_to(ctx.out(), "IntType"); },
-          [&](const BoolType &) {
-            return std::format_to(ctx.out(), "BoolType");
-          });
+      return type | Match {
+        [&](const VoidType &) { return std::format_to(ctx.out(), "VoidType"); },
+        [&](const IntType &) { return std::format_to(ctx.out(), "IntType"); },
+        [&](const BoolType &) {
+          return std::format_to(ctx.out(), "BoolType");
+        }
+      };
     }
   };
   
@@ -44,13 +47,14 @@ namespace std {
   
     auto format(const Value &value, std::format_context& ctx) const {
       constexpr auto s = R"({})";
-      return value.match(
-          [&](int64_t v) {
-            return std::format_to(ctx.out(), s, v);
-          },
-          [&](bool v) {
-            return std::format_to(ctx.out(), s, v);
-          });
+      return value | Match {
+        [&](int64_t v) {
+          return std::format_to(ctx.out(), s, v);
+        },
+        [&](bool v) {
+          return std::format_to(ctx.out(), s, v);
+        }
+      };
     }
   };
   
@@ -59,19 +63,20 @@ namespace std {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Instruction &instr, std::format_context& ctx) const {
-      return instr.match(
-          [&](const ConstantInstr &c) {
-            constexpr auto s = R"({}: {} = {})";
-            return std::format_to(ctx.out(), s, c.dest, c.type, c.value);
-          },
-          [&](const ValueInstr &v) {
-            constexpr auto s = R"({}: {} = {}, args: {}, funcs: {}, labels: {})";
-            return std::format_to(ctx.out(), s, v.dest, v.type, v.op, v.args, v.funcs, v.labels);
-          },
-          [&](const EffectInstr &e) {
-            constexpr auto s = R"({}, args: {}, funcs: {}, labels: {})";
-            return std::format_to(ctx.out(), s, e.op, e.args, e.funcs, e.labels);
-          });
+      return instr | Match {
+        [&](const ConstantInstr &c) {
+          constexpr auto s = R"({}: {} = {})";
+          return std::format_to(ctx.out(), s, c.dest, c.type, c.value);
+        },
+        [&](const ValueInstr &v) {
+          constexpr auto s = R"({}: {} = {}, args: {}, funcs: {}, labels: {})";
+          return std::format_to(ctx.out(), s, v.dest, v.type, v.op, v.args, v.funcs, v.labels);
+        },
+        [&](const EffectInstr &e) {
+          constexpr auto s = R"({}, args: {}, funcs: {}, labels: {})";
+          return std::format_to(ctx.out(), s, e.op, e.args, e.funcs, e.labels);
+        }
+      };
     }
   };
   
@@ -88,14 +93,14 @@ namespace std {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Code& arg, std::format_context& ctx) const {
-      return arg.match(
+      return arg | Match {
         [&](const Instruction& instr) {
           return std::format_to(ctx.out(), "{}", instr);
         },
         [&](const Label& label) {
           return std::format_to(ctx.out(), "{}", label);
         }
-      );
+      };
     }
   };
   
