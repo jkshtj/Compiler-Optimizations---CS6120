@@ -4,17 +4,18 @@
 #include <print>
 #include <ranges>
 
+#include <better_variant.h>
+
 #include "Core.h"
 #include "ControlFlowGraph.h"
 #include "Dominance.h"
-#include "Enum.h"
 
 namespace std {
   template<> struct std::formatter<Location> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Location &location, std::format_context& ctx) const {
-      return location | Match {
+      return location | bv::Match {
         [&](const EmptyLoc &) { return std::format_to(ctx.out(), "EmptyLoc"); },
         [&](const Loc &loc) {
           return std::format_to(ctx.out(), "Loc {{ start: {}, end: {} }}",
@@ -32,7 +33,7 @@ namespace std {
   template<> struct std::formatter<Type> {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
     auto format(const Type &type, std::format_context& ctx) const {
-      return type | Match {
+      return type | bv::Match {
         [&](const VoidType &) { return std::format_to(ctx.out(), "VoidType"); },
         [&](const IntType &) { return std::format_to(ctx.out(), "IntType"); },
         [&](const BoolType &) {
@@ -47,7 +48,7 @@ namespace std {
   
     auto format(const Value &value, std::format_context& ctx) const {
       constexpr auto s = R"({})";
-      return value | Match {
+      return value | bv::Match {
         [&](int64_t v) {
           return std::format_to(ctx.out(), s, v);
         },
@@ -63,7 +64,7 @@ namespace std {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Instruction &instr, std::format_context& ctx) const {
-      return instr | Match {
+      return instr | bv::Match {
         [&](const ConstantInstr &c) {
           constexpr auto s = R"({}: {} = {})";
           return std::format_to(ctx.out(), s, c.dest, c.type, c.value);
@@ -93,7 +94,7 @@ namespace std {
     constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
   
     auto format(const Code& arg, std::format_context& ctx) const {
-      return arg | Match {
+      return arg | bv::Match {
         [&](const Instruction& instr) {
           return std::format_to(ctx.out(), "{}", instr);
         },

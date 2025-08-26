@@ -5,6 +5,7 @@ add_executable(main main.cpp)
 target_include_directories(main PRIVATE 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/lib
+    ${better_variant_SOURCE_DIR}
 )
 
 # Link libraries

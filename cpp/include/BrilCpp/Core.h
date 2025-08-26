@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-#include "Enum.h"
+#include <better_variant.h>
 
 using json = nlohmann::json;
 
@@ -28,7 +28,7 @@ struct LocWithFile {
 
 struct EmptyLoc {};
 
-using Location = template_enum::Enum<EmptyLoc, Loc, LocWithFile>;
+using Location = bv::Variant<EmptyLoc, Loc, LocWithFile>;
 
 /////////////////////////////////////////
 ///////////////// Types /////////////////
@@ -37,12 +37,12 @@ struct IntType {};
 struct BoolType {};
 struct VoidType {};
 
-using Type = template_enum::Enum<VoidType, IntType, BoolType>;
+using Type = bv::Variant<VoidType, IntType, BoolType>;
 
 //////////////////////////////////////////
 ///////////////// Values /////////////////
 //////////////////////////////////////////
-using Value = template_enum::Enum<int64_t, bool>;
+using Value = bv::Variant<int64_t, bool>;
 
 //////////////////////////////////////////
 ////////////// Instructions //////////////
@@ -72,7 +72,7 @@ struct EffectInstr {
   Location location;
 };
 
-using Instruction = template_enum::Enum<ConstantInstr, ValueInstr, EffectInstr>;
+using Instruction = bv::Variant<ConstantInstr, ValueInstr, EffectInstr>;
 
 //////////////////////////////////////////
 ///////////////// Label //////////////////
@@ -85,7 +85,7 @@ struct Label {
 //////////////////////////////////////////
 ////////////////// Code //////////////////
 //////////////////////////////////////////
-using Code = template_enum::Enum<Label, Instruction>;
+using Code = bv::Variant<Label, Instruction>;
 
 //////////////////////////////////////////
 //////////////// Argument ////////////////

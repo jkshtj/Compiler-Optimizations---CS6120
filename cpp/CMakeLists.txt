@@ -78,6 +78,17 @@ enable_testing()
 find_package(GTest REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
+# Header-only libraries via FetchContent
+include(FetchContent)
+
+FetchContent_Declare(
+  better_variant
+  GIT_REPOSITORY https://github.com/jkshtj/better_variant.git
+  GIT_TAG main
+)
+
+FetchContent_MakeAvailable(better_variant)
+
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(test)

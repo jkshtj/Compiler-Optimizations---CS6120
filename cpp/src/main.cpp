@@ -11,10 +11,11 @@
 #include <string_view>
 #include <vector>
 
+#include <better_variant.h>
+
 #include "BrilCpp/ControlFlowGraph.h"
 #include "BrilCpp/Dominance.h"
 #include "BrilCpp/Core.h"
-#include "BrilCpp/Enum.h"
 #include "BrilCpp/Format.h"
 
 static std::string exec(const char *cmd) {
@@ -79,7 +80,7 @@ int main() {
       //   [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
       // );
 
-      instr | Match {
+      instr | bv::Match {
         [&](const Label& label) { std::println("LABEL ====> {}", label); }, 
         [&](const Instruction& instr) { std::println("INSTR ====> {}", instr); }
       };
